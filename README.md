@@ -1,177 +1,123 @@
-![Saleor Platform](https://user-images.githubusercontent.com/249912/71523206-4e45f800-28c8-11ea-84ba-345a9bfc998a.png)
-
 <div align="center">
-  <h1>Saleor Platform</h1>
+  <h1>Saylor</h1>
+  <p>Mono-repo Docker-first : API GraphQL + Dashboard + services de développement.</p>
 </div>
 
-<div align="center">
-  <p>Run all Saleor services from one repository.</p>
-</div>
+## À propos
 
-<div align="center">
- Get to know Saleor: <br>
-  <a href="https://saleor.typeform.com/talk-with-us?utm_source=github&utm_medium=readme&utm_campaign=repo_platform">Talk to a human</a>
-  <span> | </span>
-  <a href="https://cloud.saleor.io/signup?utm_source=github&utm_medium=readme&utm_campaign=repo_platform">Talk to the API</a>
-</div>
+Ce dépôt regroupe le backend (API GraphQL) et le frontend (Dashboard) dans un seul mono-repo, avec une stack Docker Compose prête pour le développement local.
 
-<br>
+Objectifs:
+- Branding "Saylor" (logo + intitulés)
+- Workflow Docker-only (pas de Node/pnpm sur l'hôte)
+- Help Center interne dans le Dashboard (routes `/help`)
 
-<div align="center">
-  <a href="https://saleor.io/">🏠 Website</a>
-  <span> • </span>
-  <a href="https://docs.saleor.io/docs/3.x/">📚 Docs</a>
-  <span> • </span>
-  <a href="https://saleor.io/blog/">📰 Blog</a>
-  <span> • </span>
-  <a href="https://twitter.com/getsaleor">🐦 Twitter</a>
-</div>
+## Structure du dépôt
 
-<div align="center">
-  <a href="https://githubbox.com/saleor/saleor-platform">🔎 Explore Code</a>
-</div>
+- `saleor/` : backend (API GraphQL)
+- `saleor-dashboard/` : frontend (Dashboard)
+- `docker-compose.yml` : stack de dev
+- `backend.env` / `common.env` : variables d'environnement (dev)
 
-## About
+## Pré-requis
 
-### What is Saleor Platform?
+- Docker + Docker Compose (Docker Desktop ou Docker Engine)
 
-Saleor Platform is the easiest way to start local development with all the major Saleor services:
-- [Core GraphQL API](https://github.com/saleor/saleor)
-- [Dashboard](https://github.com/saleor/saleor-dashboard)
-- Mailpit (Test email interface)
-- Jaeger (APM)
-- The necessary databases, cache, etc.
+## Démarrage rapide (recommandé)
 
-*Keep in mind this repository is for local development only and is not meant to be deployed in any production environment! If you're not a developer and just want to try out Saleor you can check our [live demo](https://demo.saleor.io/).*
+1) Builder et démarrer la stack:
 
-## Requirements
-1. [Docker](https://docs.docker.com/install/)
-
-## How to clone the repository?
-
-To clone the repository, run the following command
-
-```
-git clone https://github.com/saleor/saleor-platform.git
+```bash
+docker compose up -d --build
 ```
 
-## How to run it?
+2) Appliquer les migrations (premier lancement ou après reset DB):
 
-1. Project is using shared folders to enable live code reloading. For `macOS` and `Windows` users following steps are required to run `Docker compose`:
-    - Add the cloned `saleor-platform` directory to Docker shared directories (Preferences -> Resources -> File sharing).
-    - In Docker preferences dedicate at least 5 GB of memory (Preferences -> Resources -> Advanced).
-
-
-2. Go to the cloned directory:
-```shell
-cd saleor-platform
-```
-
-3. Apply Django migrations:
-```shell
+```bash
 docker compose run --rm api python3 manage.py migrate
 ```
 
-4. Populate the database with example data and create the admin user:
-```shell
+3) Créer un compte admin et charger des données d'exemple:
+
+```bash
 docker compose run --rm api python3 manage.py populatedb --createsuperuser
 ```
-*Note that `--createsuperuser` argument creates an admin account for `admin@example.com` with the password set to `admin`.*
 
-5. Run the application:
-```shell
-docker compose up
+Par défaut, `--createsuperuser` crée `admin@example.com` / `admin`.
+
+4) Ouvrir le Dashboard:
+
+- Dashboard: http://localhost:9000
+- API GraphQL: http://localhost:8000/graphql/
+
+## Premiers pas
+
+- Connexion Dashboard: utilisez l'utilisateur admin créé ci-dessus.
+- Help Center interne: http://localhost:9000/help (et sous-pages `/help/api`, `/help/extensions`, `/help/support`).
+
+## URLs locales
+
+- API (GraphQL): http://localhost:8000/graphql/
+- Dashboard: http://localhost:9000
+- Jaeger (traces): http://localhost:16686
+- Mailpit (emails): http://localhost:8025
+
+## Configuration (env)
+
+La stack charge des variables via `common.env` et `backend.env` (et quelques variables directement dans `docker-compose.yml`).
+
+Variables utiles:
+
+- `SITE_NAME` (backend): nom de l'instance (utilisé dans certains emails/contexts) — par défaut "Saylor".
+- `API_URL` (dashboard): URL GraphQL utilisée par le Dashboard (ex: `http://localhost:8000/graphql/`).
+- `SUPPORT_URL` (dashboard): URL du lien “Support” affiché dans `/help/support`.
+
+Exemple (dans `common.env` ou via l'environnement Compose):
+
+```env
+SITE_NAME=Saylor
+SUPPORT_URL=https://support.example.com
 ```
 
-## Where is the application running?
-- Saleor Core (API) - http://localhost:8000
-- Saleor Dashboard - http://localhost:9000
-- Jaeger UI (APM) - http://localhost:16686
-- Mailpit (Test email interface) - http://localhost:8025
+Note: en dev, le Dashboard est servi par Vite. Si l'URL GraphQL est mauvaise, vous verrez typiquement des erreurs du type `Unexpected end of JSON input` (souvent causées par une réponse HTML 404 au lieu de JSON).
 
-# Troubleshooting
+## Commandes utiles
 
-- [How to solve issues with lack of available space or build errors after an update](#how-to-solve-issues-with-lack-of-available-space-or-build-errors-after-an-update)
-- [How to run application parts?](#how-to-run-application-parts)
+- Voir l'état des services: `docker compose ps`
+- Voir les logs: `docker compose logs -f api` (ou `dashboard`, `worker`)
+- Ouvrir un shell dans un conteneur: `docker compose exec api bash` / `docker compose exec dashboard sh`
+- Rebuild d'un seul service: `docker compose build dashboard && docker compose up -d dashboard`
 
-## How to solve issues with lack of available space or build errors after an update
+## Dépannage
 
-Most of the time both issues can be solved by cleaning up space taken by old containers. After that, we build again whole platform. 
+### Reset base de données (supprime les données)
 
+La méthode la plus simple (supprime tous les volumes):
 
-1. Make sure docker stack is not running
-```shell
-docker compose stop
+```bash
+docker compose down --volumes
 ```
 
-2. Remove existing volumes
+Ensuite relancez:
 
-**Warning!** Proceeding will remove also your database container! If you need existing data, please remove only services that cause problems! https://docs.docker.com/compose/reference/rm/
-```shell
-docker compose rm
+```bash
+docker compose up -d --build
+docker compose run --rm api python3 manage.py migrate
+docker compose run --rm api python3 manage.py populatedb --createsuperuser
 ```
 
-3. Build fresh containers 
-```shell
-docker compose build
+### Rebuild propre (images + cache)
+
+Attention: ceci peut être long et supprime aussi les volumes si vous utilisez `down --volumes`.
+
+```bash
+docker compose build --no-cache
+docker compose up -d
 ```
 
-4. Now you can run a fresh environment using commands from `How to run it?` section. Done!
+### Démarrer seulement une partie
 
-### Still no available space
+- Backend uniquement: `docker compose up -d api worker`
+- Tout (backend + dashboard): `docker compose up -d`
 
-If you are getting issues with lack of available space, consider pruning your docker cache:
 
-**Warning!** This will remove:
-  - all stopped containers
-  - all networks not used by at least one container
-  - all dangling images
-  - all dangling build cache 
-  
-  More info: https://docs.docker.com/engine/reference/commandline/system_prune/
-  
-<details><summary>I've been warned</summary>
-<p>
-
-```shell
-docker system prune
-```
-
-</p>
-</details>
-
-### Issues with migrations after changing the versions - resetting the database
-
-Please submit an issue ticket if you spot issues with database migrations during the version update. 
-
-When testing developer releases or making local changes, you might end up in a state where you would like to reset the database completely. Since its state is persisted in the mounted volume, you'll need to use a dedicated command.
-
-**Warning!** This command will remove all data already stored in the database.
-
-<details><summary>I've been warned</summary>
-<p>
-
-```shell
-docker compose down --volumes db
-```
-
-</p>
-</details>
-   
-## How to run application parts?
-  - `docker compose up api worker` for backend services only
-  - `docker compose up` for backend and frontend services
-
-## Feedback
-
-If you have any questions or feedback, do not hesitate to contact us via [GitHub Discussions](https://github.com/saleor/saleor/discussions).
-
-## License
-
-Disclaimer: Everything you see here is open and free to use as long as you comply with the [license](https://github.com/saleor/saleor-platform/blob/main/LICENSE). There are no hidden charges. We promise to do our best to fix bugs and improve the code.
-
-Some situations do call for extra code; we can cover exotic use cases or build you a custom e-commerce appliance.
-
-#### Crafted with ❤️ by [Saleor Commerce](https://saleor.io/)
-
-hello@saleor.io
