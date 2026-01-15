@@ -1,0 +1,132 @@
+services:
+  api:
+    build:
+      context: ./saleor
+    ports:
+      - 8000:8000
+    restart: unless-stopped
+    networks:
+      - saleor-backend-tier
+    stdin_open: true
+    tty: true
+    depends_on:
+      - db
+      - cache
+      - jaeger
+    volumes:
+      # mount backend source for instant code edits
+      - ./saleor:/app
+      # shared volume between worker and api for media
+      - saleor-media:/app/media
+      # keep static files inside docker (avoid being overwritten by bind mount)
+      - saleor-static:/app/static
+    env_file:
+      - common.env
+      - backend.env
+    environment:
+      - DASHBOARD_URL=http://localhost:9000/
+      - ALLOWED_HOSTS=localhost,127.0.0.1,api
+
+  dashboard:
+    build:
+      context: ./saleor-dashboard
+      target: dev
+    ports:
+      - 9000:9000
+    restart: unless-stopped
+    command: pnpm dev --host 0.0.0.0 --port 9000
+    environment:
+      - API_URL=http://localhost:8000/graphql/
+      # more reliable file watching across mounted volumes (WSL2/Docker Desktop)
+      - CHOKIDAR_USEPOLLING=1
+      - CHOKIDAR_INTERVAL=300
+      # Optional: shown on /help/support
+      - SUPPORT_URL=${SUPPORT_URL:-}
+    volumes:
+      - ./saleor-dashboard:/app
+      - /app/node_modules/          # <--- AJOUTE CETTE LIGNE (volume anonyme prioritaire)
+      - /app/.next/                 # (Optionnel) pour accélérer si c'est du Next.js
+      - saleor-dashboard-pnpm-store:/pnpm/store
+    networks:
+      - saleor-backend-tier
+
+  db:
+    image: library/postgres:15-alpine
+    ports:
+      - 5432:5432
+    restart: unless-stopped
+    networks:
+      - saleor-backend-tier
+    volumes:
+      - saleor-db:/var/lib/postgresql/data
+      - ./replica_user.sql:/docker-entrypoint-initdb.d/replica_user.sql:ro,z
+    environment:
+      - POSTGRES_USER=saleor
+      - POSTGRES_PASSWORD=saleor
+
+  cache:
+    image: valkey/valkey:8.1-alpine
+    ports:
+      - 6379:6379
+    restart: unless-stopped
+    networks:
+      - saleor-backend-tier
+    volumes:
+      - saleor-cache:/data
+
+  worker:
+    build:
+      context: ./saleor
+    command: celery -A saleor --app=saleor.celeryconf:app worker --loglevel=info -B
+    restart: unless-stopped
+    networks:
+      - saleor-backend-tier
+    env_file:
+      - common.env
+      - backend.env
+    depends_on:
+      - cache
+      - mailpit
+    volumes:
+      # mount backend source for instant code edits
+      - ./saleor:/app
+      # shared volume between worker and api for media
+      - saleor-media:/app/media
+      # keep static files inside docker (avoid being overwritten by bind mount)
+      - saleor-static:/app/static
+
+  jaeger:
+    image: jaegertracing/jaeger
+    ports:
+      - "16686:16686"
+      - "4317:4317"
+      - "4318:4318"
+    restart: unless-stopped
+    networks:
+      - saleor-backend-tier
+    volumes:
+      - type: tmpfs
+        target: /tmp
+
+  mailpit:
+    image: axllent/mailpit
+    ports:
+      - 1025:1025 # smtp server
+      - 8025:8025 # web ui. Visit http://localhost:8025/ to check emails
+    restart: unless-stopped
+    networks:
+      - saleor-backend-tier
+
+volumes:
+  saleor-db:
+    driver: local
+  saleor-cache:
+    driver: local
+  saleor-media:
+  saleor-static:
+  saleor-dashboard-node-modules:
+  saleor-dashboard-pnpm-store:
+
+networks:
+  saleor-backend-tier:
+    driver: bridge
